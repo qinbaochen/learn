@@ -2,12 +2,18 @@ package com.cqb.wenda.demo.controller;
 
 import com.cqb.wenda.demo.dto.AccessTokenDTO;
 import com.cqb.wenda.demo.dto.GithubUser;
+import com.cqb.wenda.demo.mapper.UserMapper;
+import com.cqb.wenda.demo.model.User;
 import com.cqb.wenda.demo.provider.GithubProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+
+import javax.servlet.http.HttpServletRequest;
+import java.util.UUID;
 
 
 @Controller
@@ -16,15 +22,20 @@ public class AuthorizeController {
     @Autowired
     private GithubProvider githubProvider;
 
+    @Autowired
+    private UserMapper userMapper;
     @Value("${github.client_id}")
     private String client_id;
     @Value("${github.Client_secret}")
     private String Client_secret;
-    @Value("{${github.Redirect_uri}}")
+    @Value("${github.Redirect_uri}")
     private String Redirect_uri;
     @GetMapping("/callback")
-    public String callback(@RequestParam(name = "code") String code, @RequestParam(name = "state") String state) {
+    public String callback(@RequestParam(name = "code") String code,
+                           @RequestParam(name = "state") String state,
+                           HttpServletRequest request) {
         AccessTokenDTO accessTokenDTO = new AccessTokenDTO();
+        System.out.println(Redirect_uri);
         accessTokenDTO.setClient_secret(Client_secret);
         accessTokenDTO.setCode(code);
         accessTokenDTO.setState(state);
@@ -32,8 +43,21 @@ public class AuthorizeController {
         accessTokenDTO.setRedirect_uri(Redirect_uri);
         String accessToken = githubProvider.getAccessToken(accessTokenDTO);
         GithubUser user = githubProvider.getUser(accessToken);
-        System.out.println(user.getId());
-        return "index";
+        if (user!=null){
+            //登录成功
+            User user1 = new User();
+            user1.setToken(UUID.randomUUID().toString());
+            user1.setName(user.getName());
+            user1.setAccountId(String.valueOf(user.getId()));
+            user1.setGmtCreate(System.currentTimeMillis());
+            user1.setGmtModified(user1.getGmtCreate());
+            userMapper.insert(user1);
+            request.getSession().setAttribute("user",user);
+            return "redirect:/";
+        }else {
+            //登录失败
+            return "redirect:/";
+        }
     }
 
 }
